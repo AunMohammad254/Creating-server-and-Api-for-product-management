@@ -10,6 +10,9 @@
  * @description Frontend client for Fashion Products API testing
  */
 
+// API Configuration
+const API_BASE = 'http://localhost:3000';
+
 /**
  * DOM Content Loaded Event Handler
  * @description Initializes the application when the DOM is fully loaded
@@ -263,7 +266,7 @@ function syntaxHighlightJson(json) {
 function fetchAllProducts() {
   console.log('📥 Fetching all products...');
   
-  return fetch('/api/products', {
+  return fetch(`${API_BASE}/api/products`, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
@@ -305,7 +308,7 @@ function fetchAllProducts() {
 function fetchProduct(id) {
   console.log(`📥 Fetching product with ID: ${id}`);
   
-  return fetch(`/api/products/${id}`, {
+  return fetch(`${API_BASE}/api/products/${id}`, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
@@ -401,7 +404,7 @@ function createProduct() {
   
   console.log('📤 Sending product data:', newProduct);
   
-  return fetch('/api/products', {
+  return fetch(`${API_BASE}/api/products`, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
@@ -530,7 +533,7 @@ function updateProduct(id) {
   
   console.log('📤 Sending update data:', updates);
   
-  return fetch(`/api/products/${id}`, {
+  return fetch(`${API_BASE}/api/products/${id}`, {
     method: 'PUT',
     headers: {
       'Accept': 'application/json',
@@ -620,7 +623,7 @@ function deleteProduct(id) {
   
   console.log('📤 Sending delete request...');
   
-  return fetch(`/api/products/${id}`, {
+  return fetch(`${API_BASE}/api/products/${id}`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json'

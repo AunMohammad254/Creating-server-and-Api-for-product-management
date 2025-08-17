@@ -190,10 +190,10 @@
         
         <div class="test-buttons">
           <button class="test-api-btn" data-endpoint="get-all" data-method="GET">Get All Products</button>
-          <button class="test-api-btn" data-endpoint="get-one" data-method="GET">Get Product (ID: 1)</button>
+          <button class="test-api-btn" data-endpoint="get-one" data-method="GET">Get Product (Select ID to view)</button>
           <button class="test-api-btn" data-endpoint="create" data-method="POST">Create New Product</button>
-          <button class="test-api-btn" data-endpoint="update" data-method="PUT">Update Product (ID: 1)</button>
-          <button class="test-api-btn" data-endpoint="delete" data-method="DELETE">Delete Product (ID: 1)</button>
+          <button class="test-api-btn" data-endpoint="update" data-method="PUT">Update Product</button>
+          <button class="test-api-btn" data-endpoint="delete" data-method="DELETE">Delete Product</button>
         </div>
         
         <div class="response-display">
@@ -204,12 +204,12 @@
       
       <p>Example using Fetch API:</p>
       <pre>// Get all products
-fetch('/api/products')
+fetch('http://localhost:3000/api/products')
   .then(response => response.json())
   .then(data => console.log(data));
 
 // Add a new product
-fetch('/api/products', {
+fetch('http://localhost:3000/api/products', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'

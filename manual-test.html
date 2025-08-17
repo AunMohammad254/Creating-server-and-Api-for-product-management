@@ -212,7 +212,7 @@
 
   <script>
     // API Configuration
-    const API_BASE = '/api/products';
+    const API_BASE = 'http://localhost:3000/api/products';
     
     // Tab Switching
     document.querySelectorAll('.tab').forEach(tab => {
@@ -242,15 +242,35 @@
       
       try {
         const response = await fetch(url, options);
-        const responseData = await response.json();
-        return {
-          status: response.status,
-          data: responseData
-        };
+        
+        // Check if the response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const responseData = await response.json();
+          return {
+            status: response.status,
+            data: responseData
+          };
+        } else {
+          // Handle non-JSON responses
+          const textResponse = await response.text();
+          return {
+            status: response.status,
+            data: { 
+              message: 'Non-JSON response received', 
+              responseType: contentType,
+              preview: textResponse.substring(0, 100) + '...' 
+            }
+          };
+        }
       } catch (error) {
         return {
           status: 500,
-          data: { message: error.message }
+          data: { 
+            message: error.message,
+            url: url,
+            method: method
+          }
         };
       }
     }
