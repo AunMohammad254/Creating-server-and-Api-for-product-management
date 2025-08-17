@@ -145,20 +145,7 @@ let products = [
  * Define all API endpoints and their corresponding handlers
  */
 
-/**
- * Root Route - Serve Landing Page
- * @route GET /
- * @description Serves the main HTML page with API documentation and testing interface
- * @access Public
- */
-app.get('/', (req, res) => {
-  try {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  } catch (error) {
-    console.error('Error serving index.html:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
+// API routes will be defined here
 
 /**
  * Get All Products
@@ -514,6 +501,21 @@ app.delete('/api/products/:id', (req, res) => {
 });
 
 /**
+ * Root Route - Serve Landing Page
+ * @route GET /
+ * @description Serves the main HTML page with API documentation and testing interface
+ * @access Public
+ */
+app.get('/', (req, res) => {
+  try {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } catch (error) {
+    console.error('Error serving index.html:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+/**
  * MIDDLEWARE FOR ERROR HANDLING AND 404 ROUTES
  * These middleware functions handle errors and undefined routes
  */
@@ -556,7 +558,32 @@ app.use((err, req, res, next) => {
 });
 
 /**
- * 404 Route Handler
+ * API 404 Route Handler
+ * @description Handles requests to non-existent API routes
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next function
+ */
+app.use('/api', (req, res, next) => {
+  console.log(`API 404 - Route not found: ${req.method} ${req.url}`);
+  
+  res.status(404).json({
+    message: 'API route not found',
+    requestedUrl: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+    availableRoutes: [
+      'GET /api/products',
+      'GET /api/products/:id',
+      'POST /api/products',
+      'PUT /api/products/:id',
+      'DELETE /api/products/:id'
+    ]
+  });
+});
+
+/**
+ * General 404 Route Handler
  * @description Handles requests to non-existent routes
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object

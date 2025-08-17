@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fashion Products API - Manual Test Interface</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #2980b9;
+      margin-top: 30px;
+    }
+    .test-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .response {
+      background-color: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 15px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .status {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .status.success {
+      color: #27ae60;
+    }
+    .status.error {
+      color: #e74c3c;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      background-color: #f1f1f1;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      border-radius: 5px 5px 0 0;
+      margin-right: 5px;
+    }
+    .tab.active {
+      background-color: white;
+      border-bottom: 1px solid white;
+      margin-bottom: -1px;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Fashion Products API - Manual Test Interface</h1>
+  
+  <div class="tabs">
+    <div class="tab active" data-tab="get">GET</div>
+    <div class="tab" data-tab="post">POST</div>
+    <div class="tab" data-tab="put">PUT</div>
+    <div class="tab" data-tab="delete">DELETE</div>
+  </div>
+  
+  <!-- GET Tab -->
+  <div id="get" class="tab-content active">
+    <div class="test-section">
+      <h2>Get All Products</h2>
+      <button id="getAllProducts">Get All Products</button>
+      <div id="getAllProductsResponse" class="response"></div>
+      <div id="getAllProductsStatus" class="status"></div>
+    </div>
+    
+    <div class="test-section">
+      <h2>Get Single Product</h2>
+      <div class="form-group">
+        <label for="getProductId">Product ID:</label>
+        <input type="number" id="getProductId" value="1">
+      </div>
+      <button id="getSingleProduct">Get Product</button>
+      <div id="getSingleProductResponse" class="response"></div>
+      <div id="getSingleProductStatus" class="status"></div>
+    </div>
+  </div>
+  
+  <!-- POST Tab -->
+  <div id="post" class="tab-content">
+    <div class="test-section">
+      <h2>Create New Product</h2>
+      <div class="form-group">
+        <label for="postTitle">Title:</label>
+        <input type="text" id="postTitle" value="Test Product">
+      </div>
+      <div class="form-group">
+        <label for="postDescription">Description:</label>
+        <textarea id="postDescription">A test product for API testing</textarea>
+      </div>
+      <div class="form-group">
+        <label for="postPrice">Price:</label>
+        <input type="number" id="postPrice" value="29.99" step="0.01">
+      </div>
+      <div class="form-group">
+        <label for="postDiscount">Discount Percentage:</label>
+        <input type="number" id="postDiscount" value="5" step="0.1">
+      </div>
+      <div class="form-group">
+        <label for="postRating">Rating:</label>
+        <input type="number" id="postRating" value="4.5" step="0.1" min="0" max="5">
+      </div>
+      <div class="form-group">
+        <label for="postStock">Stock:</label>
+        <input type="number" id="postStock" value="100">
+      </div>
+      <button id="createProduct">Create Product</button>
+      <div id="createProductResponse" class="response"></div>
+      <div id="createProductStatus" class="status"></div>
+    </div>
+  </div>
+  
+  <!-- PUT Tab -->
+  <div id="put" class="tab-content">
+    <div class="test-section">
+      <h2>Update Product</h2>
+      <div class="form-group">
+        <label for="putProductId">Product ID:</label>
+        <input type="number" id="putProductId" value="1">
+      </div>
+      <div class="form-group">
+        <label for="putTitle">Title:</label>
+        <input type="text" id="putTitle" value="Updated Product">
+      </div>
+      <div class="form-group">
+        <label for="putPrice">Price:</label>
+        <input type="number" id="putPrice" value="69.99" step="0.01">
+      </div>
+      <div class="form-group">
+        <label for="putStock">Stock:</label>
+        <input type="number" id="putStock" value="50">
+      </div>
+      <button id="updateProduct">Update Product</button>
+      <div id="updateProductResponse" class="response"></div>
+      <div id="updateProductStatus" class="status"></div>
+    </div>
+  </div>
+  
+  <!-- DELETE Tab -->
+  <div id="delete" class="tab-content">
+    <div class="test-section">
+      <h2>Delete Product</h2>
+      <div class="form-group">
+        <label for="deleteProductId">Product ID:</label>
+        <input type="number" id="deleteProductId" value="5">
+      </div>
+      <button id="deleteProduct">Delete Product</button>
+      <div id="deleteProductResponse" class="response"></div>
+      <div id="deleteProductStatus" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    // API Configuration
+    const API_BASE = '/api/products';
+    
+    // Tab Switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Remove active class from all tabs and content
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked tab and corresponding content
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      });
+    });
+    
+    // Helper function to make API requests
+    async function makeRequest(method, url, data = null) {
+      const options = {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      if (data) {
+        options.body = JSON.stringify(data);
+      }
+      
+      try {
+        const response = await fetch(url, options);
+        const responseData = await response.json();
+        return {
+          status: response.status,
+          data: responseData
+        };
+      } catch (error) {
+        return {
+          status: 500,
+          data: { message: error.message }
+        };
+      }
+    }
+    
+    // Helper function to update response and status elements
+    function updateResponse(responseElement, statusElement, result) {
+      responseElement.textContent = JSON.stringify(result.data, null, 2);
+      
+      if (result.status >= 200 && result.status < 300) {
+        statusElement.textContent = `✅ Success: Status ${result.status}`;
+        statusElement.className = 'status success';
+      } else {
+        statusElement.textContent = `❌ Error: Status ${result.status}`;
+        statusElement.className = 'status error';
+      }
+    }
+    
+    // GET All Products
+    document.getElementById('getAllProducts').addEventListener('click', async () => {
+      const responseElement = document.getElementById('getAllProductsResponse');
+      const statusElement = document.getElementById('getAllProductsStatus');
+      
+      responseElement.textContent = 'Loading...';
+      statusElement.textContent = '';
+      
+      const result = await makeRequest('GET', API_BASE);
+      updateResponse(responseElement, statusElement, result);
+    });
+    
+    // GET Single Product
+    document.getElementById('getSingleProduct').addEventListener('click', async () => {
+      const id = document.getElementById('getProductId').value;
+      const responseElement = document.getElementById('getSingleProductResponse');
+      const statusElement = document.getElementById('getSingleProductStatus');
+      
+      responseElement.textContent = 'Loading...';
+      statusElement.textContent = '';
+      
+      const result = await makeRequest('GET', `${API_BASE}/${id}`);
+      updateResponse(responseElement, statusElement, result);
+    });
+    
+    // POST Create Product
+    document.getElementById('createProduct').addEventListener('click', async () => {
+      const data = {
+        title: document.getElementById('postTitle').value,
+        description: document.getElementById('postDescription').value,
+        price: parseFloat(document.getElementById('postPrice').value),
+        discountPercentage: parseFloat(document.getElementById('postDiscount').value),
+        rating: parseFloat(document.getElementById('postRating').value),
+        stock: parseInt(document.getElementById('postStock').value),
+        brand: 'TestBrand',
+        category: 'test',
+        thumbnail: 'https://example.com/thumbnail.jpg',
+        images: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg']
+      };
+      
+      const responseElement = document.getElementById('createProductResponse');
+      const statusElement = document.getElementById('createProductStatus');
+      
+      responseElement.textContent = 'Loading...';
+      statusElement.textContent = '';
+      
+      const result = await makeRequest('POST', API_BASE, data);
+      updateResponse(responseElement, statusElement, result);
+    });
+    
+    // PUT Update Product
+    document.getElementById('updateProduct').addEventListener('click', async () => {
+      const id = document.getElementById('putProductId').value;
+      const data = {
+        title: document.getElementById('putTitle').value,
+        price: parseFloat(document.getElementById('putPrice').value),
+        stock: parseInt(document.getElementById('putStock').value)
+      };
+      
+      const responseElement = document.getElementById('updateProductResponse');
+      const statusElement = document.getElementById('updateProductStatus');
+      
+      responseElement.textContent = 'Loading...';
+      statusElement.textContent = '';
+      
+      const result = await makeRequest('PUT', `${API_BASE}/${id}`, data);
+      updateResponse(responseElement, statusElement, result);
+    });
+    
+    // DELETE Product
+    document.getElementById('deleteProduct').addEventListener('click', async () => {
+      const id = document.getElementById('deleteProductId').value;
+      const responseElement = document.getElementById('deleteProductResponse');
+      const statusElement = document.getElementById('deleteProductStatus');
+      
+      responseElement.textContent = 'Loading...';
+      statusElement.textContent = '';
+      
+      const result = await makeRequest('DELETE', `${API_BASE}/${id}`);
+      updateResponse(responseElement, statusElement, result);
+    });
+  </script>
+</body>
+</html>
