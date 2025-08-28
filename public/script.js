@@ -12,6 +12,58 @@
 
 // API Configuration
 const API_BASE = 'http://localhost:3000';
+const API_TIMEOUT = 10000; // 10 seconds timeout
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+// Global error handler for uncaught promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('❌ Unhandled promise rejection:', event.reason);
+  displayResponse({
+    error: 'Unhandled Promise Rejection',
+    message: event.reason?.message || 'An unexpected error occurred',
+    timestamp: new Date().toISOString()
+  }, 'Global Error Handler', true);
+  
+  // Prevent the default browser behavior
+  event.preventDefault();
+});
+
+// Global error handler for uncaught exceptions
+window.addEventListener('error', (event) => {
+  console.error('❌ Uncaught error:', event.error);
+  displayResponse({
+    error: 'Uncaught Exception',
+    message: event.error?.message || event.message || 'An unexpected error occurred',
+    filename: event.filename,
+    lineno: event.lineno,
+    timestamp: new Date().toISOString()
+  }, 'Global Error Handler', true);
+});
+
+/**
+ * Button Loading State Management
+ * @description Manages loading states for API test buttons
+ * @param {HTMLElement} button - The button element to manage
+ * @param {boolean} isLoading - Whether to set loading state
+ */
+function setButtonLoading(button, isLoading) {
+  if (!button) return;
+  
+  if (isLoading) {
+    button.disabled = true;
+    button.dataset.originalText = button.textContent;
+    button.textContent = 'Loading...';
+    button.style.opacity = '0.7';
+    button.style.cursor = 'not-allowed';
+  } else {
+    button.disabled = false;
+    button.textContent = button.dataset.originalText || button.textContent.replace('Loading...', 'Test');
+    button.style.opacity = '1';
+    button.style.cursor = 'pointer';
+    delete button.dataset.originalText;
+  }
+}
 
 /**
  * DOM Content Loaded Event Handler
@@ -21,15 +73,87 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Fashion Products API client loaded successfully');
   console.log('📅 Loaded at:', new Date().toISOString());
   
+  // Handle favicon 404 error by creating a default one
+  handleFavicon();
+  
   // Initialize event listeners for API testing buttons
   initializeEventListeners();
   
-  // Load initial data to display all products
-  fetchAllProducts();
+  // Check server connectivity before loading data
+  checkServerConnectivity()
+    .then(() => {
+      // Load initial data to display all products
+      return fetchAllProducts();
+    })
+    .catch((error) => {
+      console.warn('⚠️ Server connectivity check failed:', error.message);
+      displayResponse({
+        error: 'Server Connection Failed',
+        message: 'Unable to connect to the API server. Please ensure the server is running on localhost:3000',
+        details: error.message,
+        timestamp: new Date().toISOString()
+      }, 'Connection Error', true);
+    });
   
   // Add form validation listeners
   initializeFormValidation();
 });
+
+/**
+ * Handle Favicon 404 Error
+ * @description Creates a default favicon to prevent 404 errors
+ */
+function handleFavicon() {
+  try {
+    // Check if favicon already exists
+    const existingFavicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
+    
+    if (!existingFavicon) {
+      // Create a simple SVG favicon
+      const favicon = document.createElement('link');
+      favicon.rel = 'icon';
+      favicon.type = 'image/svg+xml';
+      favicon.href = 'data:image/svg+xml;base64,' + btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+          <rect width="32" height="32" fill="#3498db"/>
+          <text x="16" y="20" font-family="Arial" font-size="16" fill="white" text-anchor="middle">API</text>
+        </svg>
+      `);
+      document.head.appendChild(favicon);
+      console.log('✅ Default favicon created successfully');
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to create favicon:', error.message);
+  }
+}
+
+/**
+ * Check Server Connectivity
+ * @description Verifies that the API server is running and accessible
+ * @returns {Promise} Promise that resolves if server is accessible
+ */
+function checkServerConnectivity() {
+  console.log('🔍 Checking server connectivity...');
+  
+  return fetchWithTimeout(`${API_BASE}/api/products`, {
+    method: 'HEAD',
+    headers: {
+      'Accept': 'application/json'
+    }
+  }, 5000)
+    .then(response => {
+      if (response.ok) {
+        console.log('✅ Server connectivity confirmed');
+        return true;
+      } else {
+        throw new Error(`Server responded with status ${response.status}`);
+      }
+    })
+    .catch(error => {
+      console.error('❌ Server connectivity check failed:', error);
+      throw new Error(`Cannot connect to API server: ${error.message}`);
+    });
+}
 
 /**
  * Initialize Event Listeners
@@ -111,17 +235,14 @@ function handleApiTest(event) {
   // Log the action for debugging
   console.log(`🔄 API Test: ${method} ${endpoint}`);
   
-  // Disable button during request to prevent multiple clicks
+  // Set button to loading state to prevent multiple clicks
   const button = event.target;
-  const originalText = button.textContent;
-  button.disabled = true;
-  button.textContent = 'Loading...';
+  setButtonLoading(button, true);
   
   // Re-enable button after a delay
   const enableButton = () => {
     setTimeout(() => {
-      button.disabled = false;
-      button.textContent = originalText;
+      setButtonLoading(button, false);
     }, 1000);
   };
   
@@ -182,7 +303,7 @@ function handleApiTest(event) {
 
 /**
  * Display API Response in UI
- * @description Formats and displays API responses in the response panel
+ * @description Formats and displays API responses in the response panel with enhanced validation and formatting
  * @param {Object|Array} data - The response data to display
  * @param {string} action - Description of the action performed
  * @param {boolean} isError - Whether this is an error response
@@ -197,8 +318,55 @@ function displayResponse(data, action, isError = false) {
       return;
     }
     
-    // Format the JSON with proper indentation and syntax highlighting
-    const formattedJson = JSON.stringify(data, null, 2);
+    // Validate and clean response data
+    let displayData = data;
+    if (data === null || data === undefined) {
+      displayData = { message: 'No data received', timestamp: new Date().toISOString() };
+    }
+    
+    // Enhanced data formatting with better error handling
+    let formattedJson;
+    try {
+      // Handle different data types
+      if (typeof displayData === 'string') {
+        try {
+          // Try to parse if it's a JSON string
+          displayData = JSON.parse(displayData);
+        } catch {
+          // Keep as string if not valid JSON
+        }
+      }
+      
+      // Clean up circular references and functions
+      const cleanData = JSON.parse(JSON.stringify(displayData, (key, value) => {
+        if (typeof value === 'function') {
+          return '[Function]';
+        }
+        if (value instanceof Error) {
+          return {
+            name: value.name,
+            message: value.message,
+            stack: value.stack
+          };
+        }
+        return value;
+      }));
+      
+      // Add metadata for error responses
+      if (isError && typeof cleanData === 'object') {
+        cleanData.responseMetadata = {
+          displayedAt: new Date().toISOString(),
+          errorType: action,
+          userAgent: navigator.userAgent,
+          url: window.location.href
+        };
+      }
+      
+      formattedJson = JSON.stringify(cleanData, null, 2);
+    } catch (formatError) {
+      console.warn('Error formatting response data:', formatError);
+      formattedJson = `Error formatting data: ${formatError.message}\n\nRaw data: ${String(displayData)}`;
+    }
     
     // Create syntax-highlighted HTML
     const highlightedJson = syntaxHighlightJson(formattedJson);
@@ -214,22 +382,32 @@ function displayResponse(data, action, isError = false) {
       statusElement.className = isError ? 'error-status' : 'success-status';
     }
     
-    // Scroll to response area for better UX
-    responseElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Scroll to response area for better UX with improved positioning
+    responseElement.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'nearest',
+      inline: 'nearest'
+    });
     
     // Log to console with appropriate level
     if (isError) {
-      console.error(`❌ ${action}:`, data);
+      console.error(`❌ ${action}:`, displayData);
     } else {
-      console.log(`✅ ${action}:`, data);
+      console.log(`✅ ${action}:`, displayData);
     }
     
   } catch (error) {
     console.error('❌ Error displaying response:', error);
-    // Fallback display
+    // Enhanced fallback display
     const responseElement = document.getElementById('api-response');
     if (responseElement) {
-      responseElement.innerHTML = `<pre class="json-response error">Error displaying response: ${error.message}</pre>`;
+      const fallbackData = {
+        error: 'Display Error',
+        message: `Failed to display response: ${error.message}`,
+        originalAction: action,
+        timestamp: new Date().toISOString()
+      };
+      responseElement.innerHTML = `<pre class="json-response error">${JSON.stringify(fallbackData, null, 2)}</pre>`;
     }
   }
 }
@@ -259,14 +437,92 @@ function syntaxHighlightJson(json) {
  */
 
 /**
+ * Fetch with Timeout and Retry Logic
+ * @description Enhanced fetch function with timeout and retry capabilities
+ * @param {string} url - The URL to fetch
+ * @param {Object} options - Fetch options
+ * @param {number} timeout - Timeout in milliseconds
+ * @param {number} retries - Number of retry attempts
+ * @returns {Promise} Promise that resolves with the response
+ */
+function fetchWithTimeout(url, options = {}, timeout = API_TIMEOUT, retries = MAX_RETRIES) {
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`Request timeout after ${timeout}ms`));
+    }, timeout);
+
+    // Add abort signal to options
+    const fetchOptions = {
+      ...options,
+      signal: controller.signal
+    };
+
+    const attemptFetch = (attempt) => {
+      fetch(url, fetchOptions)
+        .then(response => {
+          clearTimeout(timeoutId);
+          resolve(response);
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          
+          // Check if we should retry
+          if (attempt < retries && (error.name === 'AbortError' || error.message.includes('fetch'))) {
+            console.warn(`⚠️ Fetch attempt ${attempt + 1} failed, retrying in ${RETRY_DELAY}ms...`);
+            setTimeout(() => {
+              attemptFetch(attempt + 1);
+            }, RETRY_DELAY * attempt); // Exponential backoff
+          } else {
+            reject(error);
+          }
+        });
+    };
+
+    attemptFetch(0);
+  });
+}
+
+/**
+ * Validate API Endpoint URL
+ * @description Validates that the API endpoint URL is properly formatted
+ * @param {string} endpoint - The endpoint to validate
+ * @returns {boolean} True if valid, false otherwise
+ */
+function validateApiEndpoint(endpoint) {
+  try {
+    const url = new URL(endpoint);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch (error) {
+    console.error('❌ Invalid API endpoint URL:', endpoint);
+    return false;
+  }
+}
+
+/**
  * Fetch All Products
- * @description Retrieves all products from the API
+ * @description Retrieves all products from the API with enhanced error handling
  * @returns {Promise} Promise that resolves when the request completes
  */
 function fetchAllProducts() {
   console.log('📥 Fetching all products...');
   
-  return fetch(`${API_BASE}/api/products`, {
+  const endpoint = `${API_BASE}/api/products`;
+  
+  // Validate endpoint URL
+  if (!validateApiEndpoint(endpoint)) {
+    const error = new Error('Invalid API endpoint URL');
+    displayResponse({
+      error: 'Invalid Endpoint',
+      message: error.message,
+      endpoint: endpoint,
+      timestamp: new Date().toISOString()
+    }, 'Validation Error', true);
+    return Promise.reject(error);
+  }
+  
+  return fetchWithTimeout(endpoint, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
@@ -277,38 +533,97 @@ function fetchAllProducts() {
       console.log(`📡 Response status: ${response.status} ${response.statusText}`);
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Try to get error details from response
+        return response.text().then(text => {
+          let errorData;
+          try {
+            errorData = JSON.parse(text);
+          } catch {
+            errorData = { message: text || response.statusText };
+          }
+          throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        });
       }
       return response.json();
     })
     .then(data => {
+      // Validate response data
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response data received');
+      }
+      
       console.log(`✅ Successfully fetched ${data.total || 0} products`);
       displayResponse(data, 'All Products Retrieved');
       return data;
     })
     .catch(error => {
       console.error('❌ Error fetching products:', error);
+      
+      let errorMessage = error.message;
+      let errorType = 'Fetch Error';
+      
+      // Categorize error types
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        errorType = 'Timeout Error';
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+        errorType = 'Network Error';
+        errorMessage = 'Network error occurred. Please check if the server is running.';
+      }
+      
       displayResponse({
-        error: 'Failed to fetch products',
-        message: error.message,
+        error: errorType,
+        message: errorMessage,
+        originalError: error.message,
         timestamp: new Date().toISOString(),
         endpoint: '/api/products',
-        method: 'GET'
-      }, 'Fetch Error', true);
+        method: 'GET',
+        troubleshooting: [
+          'Ensure the API server is running on localhost:3000',
+          'Check your network connection',
+          'Verify CORS settings if making cross-origin requests'
+        ]
+      }, errorType, true);
       throw error;
     });
 }
 
 /**
  * Fetch Single Product
- * @description Retrieves a specific product by ID from the API
+ * @description Retrieves a specific product by ID from the API with enhanced error handling
  * @param {number} id - The product ID to fetch
  * @returns {Promise} Promise that resolves when the request completes
  */
 function fetchProduct(id) {
   console.log(`📥 Fetching product with ID: ${id}`);
   
-  return fetch(`${API_BASE}/api/products/${id}`, {
+  // Validate product ID
+  if (!id || isNaN(id) || id <= 0) {
+    const error = new Error('Invalid product ID provided');
+    displayResponse({
+      error: 'Invalid Product ID',
+      message: error.message,
+      providedId: id,
+      timestamp: new Date().toISOString()
+    }, 'Validation Error', true);
+    return Promise.reject(error);
+  }
+  
+  const endpoint = `${API_BASE}/api/products/${id}`;
+  
+  // Validate endpoint URL
+  if (!validateApiEndpoint(endpoint)) {
+    const error = new Error('Invalid API endpoint URL');
+    displayResponse({
+      error: 'Invalid Endpoint',
+      message: error.message,
+      endpoint: endpoint,
+      timestamp: new Date().toISOString()
+    }, 'Validation Error', true);
+    return Promise.reject(error);
+  }
+  
+  return fetchWithTimeout(endpoint, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
@@ -320,29 +635,60 @@ function fetchProduct(id) {
       
       if (!response.ok) {
         // Try to get error message from response
-        return response.json().then(errorData => {
+        return response.text().then(text => {
+          let errorData;
+          try {
+            errorData = JSON.parse(text);
+          } catch {
+            errorData = { message: text || response.statusText };
+          }
           throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-        }).catch(() => {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         });
       }
       return response.json();
     })
     .then(data => {
+      // Validate response data
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response data received');
+      }
+      
       console.log(`✅ Successfully fetched product: ${data.title || 'Unknown'}`);
       displayResponse(data, `Product ${id} Details`);
       return data;
     })
     .catch(error => {
       console.error(`❌ Error fetching product ${id}:`, error);
+      
+      let errorMessage = error.message;
+      let errorType = 'Fetch Error';
+      
+      // Categorize error types
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        errorType = 'Timeout Error';
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+        errorType = 'Network Error';
+        errorMessage = 'Network error occurred. Please check if the server is running.';
+      } else if (error.message.includes('404') || error.message.includes('not found')) {
+        errorType = 'Product Not Found';
+        errorMessage = `Product with ID ${id} was not found.`;
+      }
+      
       displayResponse({
-        error: `Failed to fetch product ${id}`,
-        message: error.message,
+        error: errorType,
+        message: errorMessage,
+        originalError: error.message,
         productId: id,
         timestamp: new Date().toISOString(),
         endpoint: `/api/products/${id}`,
-        method: 'GET'
-      }, 'Fetch Error', true);
+        method: 'GET',
+        troubleshooting: [
+          'Verify the product ID is correct',
+          'Ensure the API server is running on localhost:3000',
+          'Check if the product exists in the database'
+        ]
+      }, errorType, true);
       throw error;
     });
 }
@@ -404,7 +750,21 @@ function createProduct() {
   
   console.log('📤 Sending product data:', newProduct);
   
-  return fetch(`${API_BASE}/api/products`, {
+  const endpoint = `${API_BASE}/api/products`;
+  
+  // Validate endpoint URL
+  if (!validateApiEndpoint(endpoint)) {
+    const error = new Error('Invalid API endpoint URL');
+    displayResponse({
+      error: 'Invalid Endpoint',
+      message: error.message,
+      endpoint: endpoint,
+      timestamp: new Date().toISOString()
+    }, 'Validation Error', true);
+    return Promise.reject(error);
+  }
+
+  return fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: {
       'Accept': 'application/json',
@@ -416,21 +776,36 @@ function createProduct() {
     console.log(`📡 Response status: ${response.status} ${response.statusText}`);
     
     if (!response.ok) {
-      return response.json().then(errorData => {
+      return response.text().then(text => {
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          errorData = { message: text || response.statusText };
+        }
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }).catch(() => {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       });
     }
     return response.json();
   })
   .then(data => {
+    // Validate response data
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid response data received');
+    }
+    
     console.log('✅ Product created successfully:', data);
     displayResponse(data, 'Product Created Successfully');
     
     // Clear form inputs if they exist
-    if (titleInput) titleInput.value = '';
-    if (priceInput) priceInput.value = '';
+    if (titleInput) {
+      titleInput.value = '';
+      titleInput.style.borderColor = '';
+    }
+    if (priceInput) {
+      priceInput.value = '';
+      priceInput.style.borderColor = '';
+    }
     
     // Refresh the product list after a short delay
     console.log('🔄 Refreshing product list...');
@@ -444,14 +819,36 @@ function createProduct() {
   })
   .catch(error => {
     console.error('❌ Error creating product:', error);
+    
+    let errorMessage = error.message;
+    let errorType = 'Creation Error';
+    
+    // Categorize error types
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      errorType = 'Timeout Error';
+      errorMessage = 'Request timed out. Please check your connection and try again.';
+    } else if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+      errorType = 'Network Error';
+      errorMessage = 'Network error occurred. Please check if the server is running.';
+    } else if (error.message.includes('400') || error.message.includes('validation')) {
+      errorType = 'Validation Error';
+      errorMessage = 'Product data validation failed. Please check your input.';
+    }
+    
     displayResponse({
-      error: 'Failed to create product',
-      message: error.message,
+      error: errorType,
+      message: errorMessage,
+      originalError: error.message,
       productData: newProduct,
       timestamp: new Date().toISOString(),
       endpoint: '/api/products',
-      method: 'POST'
-    }, 'Creation Error', true);
+      method: 'POST',
+      troubleshooting: [
+        'Verify all required fields are filled correctly',
+        'Ensure the API server is running on localhost:3000',
+        'Check that product data meets validation requirements'
+      ]
+    }, errorType, true);
     throw error;
   });
 }
@@ -533,7 +930,21 @@ function updateProduct(id) {
   
   console.log('📤 Sending update data:', updates);
   
-  return fetch(`${API_BASE}/api/products/${id}`, {
+  const endpoint = `${API_BASE}/api/products/${id}`;
+  
+  // Validate endpoint URL
+  if (!validateApiEndpoint(endpoint)) {
+    const error = new Error('Invalid API endpoint URL');
+    displayResponse({
+      error: 'Invalid Endpoint',
+      message: error.message,
+      endpoint: endpoint,
+      timestamp: new Date().toISOString()
+    }, 'Validation Error', true);
+    return Promise.reject(error);
+  }
+
+  return fetchWithTimeout(endpoint, {
     method: 'PUT',
     headers: {
       'Accept': 'application/json',
@@ -545,21 +956,36 @@ function updateProduct(id) {
     console.log(`📡 Response status: ${response.status} ${response.statusText}`);
     
     if (!response.ok) {
-      return response.json().then(errorData => {
+      return response.text().then(text => {
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          errorData = { message: text || response.statusText };
+        }
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }).catch(() => {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       });
     }
     return response.json();
   })
   .then(data => {
+    // Validate response data
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid response data received');
+    }
+    
     console.log('✅ Product updated successfully:', data);
     displayResponse(data, `Product ${id} Updated Successfully`);
     
     // Clear form inputs if they exist
-    if (titleInput) titleInput.value = '';
-    if (priceInput) priceInput.value = '';
+    if (titleInput) {
+      titleInput.value = '';
+      titleInput.style.borderColor = '';
+    }
+    if (priceInput) {
+      priceInput.value = '';
+      priceInput.style.borderColor = '';
+    }
     
     // Refresh the product list after a short delay
     console.log('🔄 Refreshing product list...');
@@ -573,15 +999,40 @@ function updateProduct(id) {
   })
   .catch(error => {
     console.error(`❌ Error updating product ${id}:`, error);
+    
+    let errorMessage = error.message;
+    let errorType = 'Update Error';
+    
+    // Categorize error types
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      errorType = 'Timeout Error';
+      errorMessage = 'Request timed out. Please check your connection and try again.';
+    } else if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+      errorType = 'Network Error';
+      errorMessage = 'Network error occurred. Please check if the server is running.';
+    } else if (error.message.includes('404') || error.message.includes('not found')) {
+      errorType = 'Product Not Found';
+      errorMessage = `Product with ID ${id} was not found.`;
+    } else if (error.message.includes('400') || error.message.includes('validation')) {
+      errorType = 'Validation Error';
+      errorMessage = 'Product update data validation failed. Please check your input.';
+    }
+    
     displayResponse({
-      error: `Failed to update product ${id}`,
-      message: error.message,
+      error: errorType,
+      message: errorMessage,
+      originalError: error.message,
       productId: id,
       updateData: updates,
       timestamp: new Date().toISOString(),
       endpoint: `/api/products/${id}`,
-      method: 'PUT'
-    }, 'Update Error', true);
+      method: 'PUT',
+      troubleshooting: [
+        'Verify the product ID exists',
+        'Check that update data is valid',
+        'Ensure the API server is running on localhost:3000'
+      ]
+    }, errorType, true);
     throw error;
   });
 }
@@ -623,7 +1074,21 @@ function deleteProduct(id) {
   
   console.log('📤 Sending delete request...');
   
-  return fetch(`${API_BASE}/api/products/${id}`, {
+  const endpoint = `${API_BASE}/api/products/${id}`;
+  
+  // Validate endpoint URL
+  if (!validateApiEndpoint(endpoint)) {
+    const error = new Error('Invalid API endpoint URL');
+    displayResponse({
+      error: 'Invalid Endpoint',
+      message: error.message,
+      endpoint: endpoint,
+      timestamp: new Date().toISOString()
+    }, 'Validation Error', true);
+    return Promise.reject(error);
+  }
+
+  return fetchWithTimeout(endpoint, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json'
@@ -633,15 +1098,31 @@ function deleteProduct(id) {
     console.log(`📡 Response status: ${response.status} ${response.statusText}`);
     
     if (!response.ok) {
-      return response.json().then(errorData => {
+      return response.text().then(text => {
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          errorData = { message: text || response.statusText };
+        }
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }).catch(() => {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       });
     }
-    return response.json();
+    
+    // Handle empty response for successful deletion
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    } else {
+      return { message: `Product ${id} deleted successfully`, id: id };
+    }
   })
   .then(data => {
+    // Validate response data
+    if (!data || typeof data !== 'object') {
+      data = { message: `Product ${id} deleted successfully`, id: id };
+    }
+    
     console.log('✅ Product deleted successfully:', data);
     displayResponse(data, `Product ${id} Deleted Successfully`);
     
@@ -657,14 +1138,40 @@ function deleteProduct(id) {
   })
   .catch(error => {
     console.error(`❌ Error deleting product ${id}:`, error);
+    
+    let errorMessage = error.message;
+    let errorType = 'Delete Error';
+    
+    // Categorize error types
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      errorType = 'Timeout Error';
+      errorMessage = 'Request timed out. Please check your connection and try again.';
+    } else if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+      errorType = 'Network Error';
+      errorMessage = 'Network error occurred. Please check if the server is running.';
+    } else if (error.message.includes('404') || error.message.includes('not found')) {
+      errorType = 'Product Not Found';
+      errorMessage = `Product with ID ${id} was not found or has already been deleted.`;
+    } else if (error.message.includes('403') || error.message.includes('forbidden')) {
+      errorType = 'Permission Error';
+      errorMessage = 'You do not have permission to delete this product.';
+    }
+    
     displayResponse({
-      error: `Failed to delete product ${id}`,
-      message: error.message,
+      error: errorType,
+      message: errorMessage,
+      originalError: error.message,
       productId: id,
       timestamp: new Date().toISOString(),
       endpoint: `/api/products/${id}`,
-      method: 'DELETE'
-    }, 'Delete Error', true);
+      method: 'DELETE',
+      troubleshooting: [
+        'Verify the product ID exists',
+        'Check if the product has already been deleted',
+        'Ensure the API server is running on localhost:3000',
+        'Verify you have permission to delete products'
+      ]
+    }, errorType, true);
     throw error;
   });
 }

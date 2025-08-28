@@ -11,7 +11,7 @@ A comprehensive REST API for managing fashion products built with Node.js and Ex
 
 Check out the live preview of the API documentation and testing interface: [Live Preview](https://fashion-product-api.netlify.app/)
 
-## ✨ Features
+For Manual Testing: [Click here](manual-test.html)
 
 ### 🔧 Core API Functionality
 - **CRUD Operations**: Complete Create, Read, Update, Delete operations for products
