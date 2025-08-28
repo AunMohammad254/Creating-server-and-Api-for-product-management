@@ -88,6 +88,46 @@ You can also test the API manually using the web interface:
 2. Use the interactive testing interface
 3. Test all CRUD operations with the provided forms
 
+## TestSprite Automated Testing
+
+### Prerequisites
+- TestSprite MCP server configured
+- API server running on `http://localhost:3000`
+- All dependencies installed via `npm install`
+
+### Running TestSprite Tests
+
+1. **Bootstrap TestSprite** (required before first run):
+   ```bash
+   # TestSprite will automatically detect project type and port
+   # Default configuration: frontend test, port 3000
+   ```
+
+2. **Generate Test Plan**:
+   - TestSprite automatically generates comprehensive test plans
+   - Covers all CRUD operations and UI interactions
+   - Includes error handling and edge cases
+
+3. **Execute Tests**:
+   - Tests run in headless Chrome browser
+   - Automatic screenshot capture on failures
+   - Detailed error reporting with troubleshooting steps
+
+### TestSprite Test Features
+
+- **Smart Confirmation Handling**: Tests use `?test=true` parameter to bypass UI confirmation dialogs
+- **Comprehensive Error Testing**: Validates API error responses and UI error displays
+- **Loading State Verification**: Checks UI loading indicators during API calls
+- **Data Consistency Testing**: Verifies data integrity across multiple operations
+- **Performance Monitoring**: Tracks API response times and identifies bottlenecks
+
+### Test Reports
+
+TestSprite generates detailed reports in multiple formats:
+- `testsprite-mcp-test-report.html` - Interactive HTML report
+- `testsprite-mcp-test-report.md` - Markdown summary
+- `test_results.json` - Raw test data for analysis
+
 ## API Endpoints Reference
 
 ### GET /api/products
@@ -221,6 +261,28 @@ Deletes a product and returns deletion confirmation.
    - Check that the API server is running
    - Verify the base URL in `testsprite.config.js`
    - Ensure all required fields are provided in test data
+
+### TestSprite-Specific Troubleshooting
+
+4. **TC010 Delete Product test failures**
+   - **Issue**: UI confirmation dialogs block automated tests
+   - **Solution**: Tests now use `?test=true` URL parameter to bypass confirmation dialogs
+   - **Manual Testing**: Remove the test parameter to test with confirmation dialogs
+
+5. **Test timeout issues**
+   - **Issue**: Tests timing out due to slow server response
+   - **Solution**: Increase timeout values in test files or optimize server performance
+   - **Check**: Verify server is running and responsive at `http://localhost:3000`
+
+6. **Generic failure assertions**
+   - **Issue**: Tests failing with "generic failure assertion" messages
+   - **Solution**: Updated tests now have specific assertions for expected outcomes
+   - **Debug**: Check browser console logs in test results for detailed error information
+
+7. **Rate limiting (429 errors)**
+   - **Issue**: Too many rapid API requests causing rate limit errors
+   - **Solution**: Add delays between test operations or implement request throttling
+   - **Monitor**: Check server logs for rate limiting patterns
 
 ### Debug Mode
 

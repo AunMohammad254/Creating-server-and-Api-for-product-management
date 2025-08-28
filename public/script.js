@@ -1046,21 +1046,35 @@ function updateProduct(id) {
 function deleteProduct(id) {
   console.log(`🗑️ Deleting product with ID: ${id}`);
   
-  // Validate product ID
-  if (!id || isNaN(id) || id <= 0) {
-    const error = 'Invalid product ID provided for deletion';
-    console.error('❌', error);
-    displayResponse({
-      error: 'Invalid Product ID',
-      message: error,
-      providedId: id,
-      timestamp: new Date().toISOString()
-    }, 'Delete Error', true);
-    return Promise.reject(new Error(error));
+  // Enhanced validation for product ID
+  if (!id) {
+    const errorMsg = 'Product ID is required for deletion';
+    console.error('❌ Missing product ID');
+    displayResponse({ error: errorMsg, hint: 'Please enter a product ID in the input field' }, 'Validation Error');
+    return Promise.reject(new Error(errorMsg));
   }
   
-  // Show confirmation dialog for destructive action
-  const confirmDelete = confirm(`Are you sure you want to delete product ${id}? This action cannot be undone.`);
+  if (isNaN(id)) {
+    const errorMsg = 'Product ID must be a valid number';
+    console.error('❌ Invalid product ID format:', id);
+    displayResponse({ error: errorMsg, hint: 'Please enter a numeric product ID (e.g., 1, 2, 3)' }, 'Validation Error');
+    return Promise.reject(new Error(errorMsg));
+  }
+  
+  if (id <= 0) {
+    const errorMsg = 'Product ID must be a positive number';
+    console.error('❌ Invalid product ID value:', id);
+    displayResponse({ error: errorMsg, hint: 'Product IDs start from 1' }, 'Validation Error');
+    return Promise.reject(new Error(errorMsg));
+  }
+  
+  // Show confirmation dialog for destructive action (skip in test mode)
+  const isTestMode = window.location.search.includes('test=true') || window.testMode === true;
+  let confirmDelete = true;
+  
+  if (!isTestMode) {
+    confirmDelete = confirm(`Are you sure you want to delete product ${id}? This action cannot be undone.`);
+  }
   
   if (!confirmDelete) {
     console.log('🚫 Product deletion cancelled by user');
@@ -1141,20 +1155,33 @@ function deleteProduct(id) {
     
     let errorMessage = error.message;
     let errorType = 'Delete Error';
+    let troubleshooting = 'Please try again or contact support if the problem persists.';
     
-    // Categorize error types
+    // Enhanced error handling with specific messages and recovery suggestions
     if (error.name === 'AbortError' || error.message.includes('timeout')) {
       errorType = 'Timeout Error';
-      errorMessage = 'Request timed out. Please check your connection and try again.';
+      errorMessage = 'Delete request timed out after 10 seconds';
+      troubleshooting = 'The server is taking too long to respond. Please check server status and try again.';
     } else if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
       errorType = 'Network Error';
-      errorMessage = 'Network error occurred. Please check if the server is running.';
+      errorMessage = 'Network connection failed';
+      troubleshooting = 'Please check your internet connection, ensure the server is running on http://localhost:3000, and verify firewall settings.';
     } else if (error.message.includes('404') || error.message.includes('not found')) {
       errorType = 'Product Not Found';
-      errorMessage = `Product with ID ${id} was not found or has already been deleted.`;
+      errorMessage = `Product with ID ${id} does not exist`;
+      troubleshooting = 'The product may have already been deleted, or the ID is incorrect. Use "Get All Products" to see available products.';
     } else if (error.message.includes('403') || error.message.includes('forbidden')) {
       errorType = 'Permission Error';
-      errorMessage = 'You do not have permission to delete this product.';
+      errorMessage = 'Access denied for delete operation';
+      troubleshooting = 'You may not have sufficient permissions to delete this product. Contact your administrator.';
+    } else if (error.message.includes('500')) {
+      errorType = 'Server Error';
+      errorMessage = 'Server error occurred during deletion';
+      troubleshooting = 'There was an internal server error. Please try again later or contact support.';
+    } else if (error.message.includes('429')) {
+      errorType = 'Rate Limit Error';
+      errorMessage = 'Too many requests - rate limit exceeded';
+      troubleshooting = 'Please wait a moment before trying again. The server is temporarily limiting requests.';
     }
     
     displayResponse({
@@ -1165,11 +1192,13 @@ function deleteProduct(id) {
       timestamp: new Date().toISOString(),
       endpoint: `/api/products/${id}`,
       method: 'DELETE',
-      troubleshooting: [
+      troubleshooting: troubleshooting,
+      detailedSteps: [
         'Verify the product ID exists',
         'Check if the product has already been deleted',
         'Ensure the API server is running on localhost:3000',
-        'Verify you have permission to delete products'
+        'Verify you have permission to delete products',
+        'Check browser console for additional error details'
       ]
     }, errorType, true);
     throw error;
