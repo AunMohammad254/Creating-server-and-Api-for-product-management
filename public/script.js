@@ -11,7 +11,7 @@
  */
 
 // API Configuration
-const API_BASE = 'http://localhost:3000';
+const API_BASE = window.location.origin;
 const API_TIMEOUT = 10000; // 10 seconds timeout
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
@@ -136,7 +136,7 @@ function checkServerConnectivity() {
   console.log('🔍 Checking server connectivity...');
   
   return fetchWithTimeout(`${API_BASE}/api/products`, {
-    method: 'HEAD',
+    method: 'GET',
     headers: {
       'Accept': 'application/json'
     }
